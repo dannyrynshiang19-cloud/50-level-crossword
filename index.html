@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#172554">
+<title>50-Level Crossword</title>
+<style>
+:root{--navy:#172554;--blue:#2563eb;--pale:#eff6ff;--gold:#f59e0b;--ink:#172033;--muted:#64748b;--line:#dbe4f0}
+*{box-sizing:border-box}body{margin:0;background:#f4f7fb;color:var(--ink);font:16px system-ui,-apple-system,Segoe UI,sans-serif}
+header{background:linear-gradient(135deg,#172554,#2563eb);color:white;padding:24px 18px 28px;border-radius:0 0 26px 26px}
+.wrap{max-width:760px;margin:auto;padding:0 14px}h1{font-size:clamp(25px,6vw,36px);margin:0 0 6px}header p{margin:0;color:#dbeafe}
+main{padding:18px 0 40px}.panel{background:white;border:1px solid var(--line);border-radius:18px;padding:16px;margin:0 0 14px;box-shadow:0 4px 18px #0f172a08}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.pill{background:var(--pale);color:#1d4ed8;padding:6px 10px;border-radius:99px;font-size:13px;font-weight:700}
+button{font:inherit;border:0;border-radius:12px;padding:11px 14px;background:var(--blue);color:white;font-weight:700;cursor:pointer}button.secondary{background:#e8eef8;color:#1e293b}button.gold{background:#fef3c7;color:#92400e}button:disabled{opacity:.42;cursor:not-allowed}
+.progress{height:8px;background:#e2e8f0;border-radius:20px;overflow:hidden;margin-top:10px}.progress span{display:block;height:100%;background:#22c55e;width:0;transition:width .2s}
+#levels{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:14px}.level{padding:12px 2px;border:1px solid var(--line);background:white;color:var(--ink);border-radius:12px}.level.done{background:#dcfce7;border-color:#86efac}.level.locked{opacity:.4}
+#board{display:grid;gap:3px;justify-content:center;margin:18px auto;max-width:100%;overflow:auto}.cell{width:min(9vw,42px);height:min(9vw,42px);max-width:42px;max-height:42px;min-width:27px;min-height:27px;border:1px solid #b8c7dc;border-radius:5px;background:#fff;position:relative;padding:0;color:#0f172a;font-size:clamp(13px,3.5vw,20px);font-weight:800;text-align:center;text-transform:uppercase}.cell.block{background:#172554;border-color:#172554}.cell.active{background:#bfdbfe;border:2px solid #2563eb}.cell.filled{background:#f8fbff}.cell small{position:absolute;top:1px;left:3px;font-size:8px;color:#64748b;font-weight:600}
+.clue{background:#eff6ff;border-radius:12px;padding:12px;margin:8px 0}.clue strong{color:#1d4ed8}.status{min-height:24px;color:#475569;font-size:14px;margin-top:8px}.tier{font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.08em;font-weight:800}
+input#letterInput{position:absolute;opacity:.01;width:1px;height:1px;pointer-events:none}
+@media(min-width:600px){#levels{grid-template-columns:repeat(10,1fr)}}
+</style>
+</head>
+<body>
+<header><div class="wrap"><h1>🧩 50-Level Crossword</h1><p>Start easy. Think sharper. Become a word master.</p></div></header>
+<main class="wrap">
+<section class="panel">
+ <div class="row"><div><div class="tier">Your journey</div><h2 style="margin:4px 0">Level <span id="levelNum">1</span> of 50</h2></div><span class="pill" id="tierName">Beginner</span></div>
+ <div class="progress"><span id="progressBar"></span></div>
+ <div class="row" style="margin-top:10px"><span id="progressText">0 / 50 levels completed</span><span>⭐ <b id="stars">0</b></span></div>
+</section>
+<section class="panel" id="gamePanel">
+ <div class="row"><div><div class="tier" id="tierLabel">Beginner</div><h2 id="puzzleTitle" style="margin:4px 0">Warm-up</h2></div><span class="pill" id="wordCount">3 words</span></div>
+ <p style="color:#64748b;margin:4px 0">Tap a white square, then type. Tap a square again to switch direction.</p>
+ <div id="board" aria-label="Crossword grid"></div>
+ <div id="clues"></div>
+ <input id="letterInput" autocomplete="off" autocapitalize="characters" maxlength="1" aria-label="Type a letter">
+ <div class="row" style="margin-top:12px">
+  <button class="secondary" id="checkBtn">Check answers</button><button class="gold" id="hintBtn">💡 Hint (3)</button>
+ </div>
+ <div class="row" style="margin-top:10px"><button class="secondary" id="restartBtn">Restart level</button><button id="nextBtn" disabled>Next level →</button></div>
+ <div class="status" id="status" role="status">Fill in the words to complete the puzzle.</div>
+</section>
+<section class="panel">
+ <div class="row"><h2 style="margin:0">Choose a level</h2><button class="secondary" id="resetBtn">Reset progress</button></div>
+ <p style="color:#64748b;font-size:14px">Complete a level to unlock the next one.</p><div id="levels"></div>
+</section>
+<section class="panel"><h3 style="margin-top:0">How to play</h3><ol style="padding-left:20px;color:#475569"><li>Select a numbered clue or a square.</li><li>Type the answer. Crossing words share letters.</li><li>Use Check answers to see whether your entries are correct.</li><li>Hints reveal one letter. You have 3 hints per level.</li><li>Finish each puzzle to unlock the next level.</li></ol></section>
+</main>
+<script>
+const BANK=[
+["CAT","A small pet that says meow","DOG","A loyal pet that barks","PET","An animal kept at home"],
+["SUN","The star that lights our day","MOON","Earth's natural night-time satellite","SKY","What clouds float in"],
+["BOOK","Pages bound together for reading","READ","Look at and understand written words","PEN","A tool for writing with ink"],
+["FISH","An animal that swims with fins","SEA","A large body of salt water","FIN","A fish uses this to steer"],
+["TREE","A tall plant with a trunk","LEAF","A flat green part of a plant","ROOT","The part that grows underground"],
+["BIRD","An animal with feathers and wings","NEST","A bird's home","WING","A bird uses this to fly"],
+["MILK","A white drink from cows","CUP","A small drinking vessel","MUG","A cup with a handle"],
+["RAIN","Water falling from clouds","WET","Covered with water","CLOUD","A fluffy shape in the sky"],
+["CAKE","A sweet baked dessert","BAKE","Cook in an oven","EGG","A common baking ingredient"],
+["STAR","A bright object in the night sky","NIGHT","The dark time after sunset","DARK","Without much light"],
+["APPLE","A crunchy fruit often red or green","PEAR","A sweet fruit with a narrow top","PLUM","A small fruit with a stone"],
+["BREAD","A baked food made from flour","FLOUR","Powder used to make bread","YEAST","Helps bread dough rise"],
+["TRAIN","A vehicle that runs on rails","RAIL","A track for trains","TRACK","A path or route to follow"],
+["HOUSE","A building where people live","ROOM","A space inside a house","DOOR","You open this to enter"],
+["SMILE","A happy expression on your face","GRIN","A broad smile","HAPPY","Feeling pleased"],
+["RIVER","A natural stream of flowing water","BANK","The land beside a river","FLOW","Move steadily like water"],
+["MUSIC","Organised sound with rhythm","SONG","Music with words or a melody","NOTE","A single musical sound"],
+["GREEN","The colour of grass","GRASS","A green plant covering lawns","SEED","Can grow into a plant"],
+["CLOCK","An object that tells time","HOUR","Sixty minutes","TIME","Measured in seconds and minutes"],
+["BRAVE","Ready to face danger","COURAGE","The ability to face fear","FEAR","The feeling of being afraid"],
+["PLANET","A large world orbiting a star","ORBIT","The path around a star or planet","SPACE","The vast region beyond Earth"],
+["OCEAN","A huge body of salt water","WAVE","A moving ridge of water","SHORE","Land at the edge of the sea"],
+["POETRY","Writing that often uses rhythm","RHYME","Words with similar ending sounds","VERSE","A line or group of poetic lines"],
+["PUZZLE","A problem that needs solving","SOLVE","Find the answer to a problem","LOGIC","Reasoning used to reach an answer"],
+["ENERGY","The ability to do work","POWER","The ability or capacity to act","FORCE","A push or pull"],
+["ANCIENT","Belonging to the distant past","HISTORY","The study of past events","RELIC","An object surviving from long ago"],
+["COMPASS","A tool that shows direction","NORTH","The direction toward the North Pole","MAP","A drawing of an area"],
+["VOLCANO","A mountain that may erupt lava","LAVA","Molten rock flowing on the surface","ASH","Fine powder left after burning"],
+["LIBRARY","A place to borrow books","AUTHOR","A person who writes a book","NOVEL","A long work of fiction"],
+["WEATHER","Conditions outside, such as rain","CLIMATE","Typical weather over a long period","STORM","Severe weather with wind or rain"],
+["MYSTERY","Something difficult to explain","SECRET","Information kept hidden","CLUE","A hint that helps solve a mystery"],
+["HABITAT","The natural home of an organism","SPECIES","A group of similar organisms","WILDLIFE","Animals living naturally in an area"],
+["CIRCUIT","A closed path for electric current","VOLTAGE","Electrical potential difference","CURRENT","Flow of electric charge"],
+["GRAVITY","Force that attracts objects toward each other","MASS","Amount of matter in an object","WEIGHT","Force due to gravity on an object"],
+["ECLIPSE","When one celestial body blocks another","SHADOW","An area where light is blocked","LUNAR","Related to Earth's moon"],
+["DEMOCRACY","Government in which people have a say","ELECTION","A process for choosing leaders","VOTING","Casting a choice in an election"],
+["ECOSYSTEM","Living things and their environment","BALANCE","A stable or even condition","NATURE","The physical world and living things"],
+["ALGORITHM","A set of steps for solving a problem","METHOD","A particular way of doing something","PROCESS","A series of actions"],
+["LANGUAGE","A system of communication","GRAMMAR","Rules for arranging words","PHRASE","A small group of words"],
+["CURIOSITY","A strong desire to learn or know","DISCOVER","Find something for the first time","QUESTION","A sentence asking for information"],
+["RESILIENT","Able to recover after difficulty","ADAPT","Adjust to new conditions","ENDURE","Last through a difficult time"],
+["METAPHOR","A figure of speech comparing unlike things","SYMBOL","Something that represents an idea","IMAGERY","Language that creates mental pictures"],
+["HYPOTHESIS","A testable proposed explanation","EVIDENCE","Information supporting a conclusion","THEORY","A well-supported explanatory framework"],
+["PERSPECTIVE","A particular way of viewing something","VIEWPOINT","A position or way of thinking","CONTEXT","Circumstances surrounding an event"],
+["INNOVATION","A new idea or useful improvement","INVENT","Create something new","DESIGN","A plan for making something"],
+["PHILOSOPHY","Study of fundamental questions and ideas","ETHICS","Study of right and wrong","REASON","The power of logical thought"],
+["AMBIGUOUS","Having more than one possible meaning","UNCERTAIN","Not fully known or decided","IMPLICIT","Suggested rather than directly stated"],
+["PARADOX","A seeming contradiction that may be true","CONTRARY","Opposite in nature or direction","LOGICAL","Following valid reasoning"],
+["SYNTHESIS","Combining ideas into a whole","ANALYSIS","Careful study of parts","INFER","Reach a conclusion from evidence"],
+["EPHEMERAL","Lasting for a very short time","TRANSIENT","Temporary rather than permanent","MOMENT","A brief period of time"]
+];
+const $=id=>document.getElementById(id);
+let level=+(localStorage.getItem("crosswordLevel")||1), done=JSON.parse(localStorage.getItem("crosswordDone")||"[]"), current=null, selected=null, direction="across", hints=3, solved=false;
+const tier=n=>n<=10?"Beginner":n<=20?"Easy":n<=30?"Intermediate":n<=40?"Advanced":"Expert";
+function clean(s){return s.toUpperCase().replace(/[^A-Z]/g,"")}
+function buildPuzzle(n){
+ const b=BANK[n-1], words=[{answer:b[0],clue:b[1]},{answer:b[2],clue:b[3]},{answer:b[4],clue:b[5]}];
+ // Lay out three intersecting words. The first runs horizontally; the others cross it where letters match.
+ const placed=[{...words[0],r:7,c:2,dir:"across",num:1}], used=new Set();
+ for(let wi=1;wi<words.length;wi++){
+  let found=null;
+  outer:for(let i=0;i<placed.length;i++){
+   const p=placed[i];
+   for(let a=0;a<words[wi].answer.length;a++)for(let z=0;z<p.answer.length;z++){
+    if(words[wi].answer[a]!==p.answer[z])continue;
+    const r=p.dir==="across"?p.r-a:p.r+z,c=p.dir==="across"?p.c+z:p.c-a,dir=p.dir==="across"?"down":"across";
+    if(r<0||c<0||r+ (dir==="down"?words[wi].answer.length:1)>17||c+(dir==="across"?words[wi].answer.length:1)>17)continue;
+    let ok=true;
+    for(let k=0;k<words[wi].answer.length;k++){
+     const rr=r+(dir==="down"?k:0),cc=c+(dir==="across"?k:0), ch=words[wi].answer[k];
+     for(const q of placed){for(let j=0;j<q.answer.length;j++){let qr=q.r+(q.dir==="down"?j:0),qc=q.c+(q.dir==="across"?j:0);if(qr===rr&&qc===cc&&q.answer[j]!==ch)ok=false;}}
+    }
+    if(ok){found={...words[wi],r,c,dir,num:wi+1};break outer}
+   }
+  }
+  if(!found){const p=placed[0];found={...words[wi],r:p.r+2+wi,c:p.c+1,dir:"down",num:wi+1};}
+  placed.push(found);
+ }
+ // Shift any negative coordinates into the board.
+ const minR=Math.min(...placed.map(p=>p.r)),minC=Math.min(...placed.map(p=>p.c));
+ placed.forEach(p=>{p.r-=minR;p.c-=minC});
+ let maxR=0,maxC=0;placed.forEach(p=>{maxR=Math.max(maxR,p.r+(p.dir==="down"?p.answer.length-1:0));maxC=Math.max(maxC,p.c+(p.dir==="across"?p.answer.length-1:0))});
+ const rows=maxR+1,cols=maxC+1,cells=Array.from({length:rows},()=>Array(cols).fill(null));
+ placed.forEach(p=>{for(let k=0;k<p.answer.length;k++){let r=p.r+(p.dir==="down"?k:0),c=p.c+(p.dir==="across"?k:0);if(!cells[r][c])cells[r][c]={answer:p.answer[k],value:"",entries:[],number:null};cells[r][c].entries.push(p.num);if(k===0)cells[r][c].number=p.num;}});
+ return {words:placed,cells,rows,cols,title:["Warm-up","Word Explorer","Brain Builder","Mind Bender","Master Challenge"][Math.floor((n-1)/10)]};
+}
+function render(){
+ current=buildPuzzle(level);hints=3;solved=false;selected=null;direction="across";
+ $("levelNum").textContent=level;$("tierName").textContent=tier(level);$("tierLabel").textContent=tier(level);$("puzzleTitle").textContent=current.title;$("wordCount").textContent=current.words.length+" words";$("hintBtn").textContent="💡 Hint ("+hints+")";$("nextBtn").disabled=true;$("status").textContent="Fill in the words to complete the puzzle.";
+ $("board").style.gridTemplateColumns=`repeat(${current.cols},minmax(27px,42px))`;$("board").innerHTML="";
+ current.cells.forEach((row,r)=>row.forEach((cell,c)=>{const el=document.createElement("button");el.className="cell"+(!cell?" block":"");el.type="button";el.dataset.r=r;el.dataset.c=c;el.setAttribute("aria-label",cell?`row ${r+1} column ${c+1}`:"blocked");if(cell){if(cell.number){const sm=document.createElement("small");sm.textContent=cell.number;el.append(sm)}const span=document.createElement("span");span.textContent=cell.value;el.append(span);el.onclick=()=>selectCell(r,c)}$("board").append(el)}));
+ $("clues").innerHTML="";for(const dir of ["across","down"]){const h=document.createElement("h3");h.textContent=dir==="across"?"Across →":"Down ↓";h.style.margin="14px 0 6px";$("clues").append(h);current.words.filter(w=>w.dir===dir).forEach(w=>{const d=document.createElement("div");d.className="clue";d.innerHTML=`<strong>${w.num}.</strong> ${w.clue} <span style="color:#64748b">(${w.answer.length} letters)</span>`;d.onclick=()=>{direction=dir;selectCell(w.r,w.c)};$("clues").append(d)})}
+ drawLevels();updateProgress();
+}
+function selectCell(r,c){if(!current.cells[r][c])return;if(selected&&selected.r===r&&selected.c===c){direction=direction==="across"?"down":"across"}selected={r,c};highlight();$("letterInput").focus()}
+function highlight(){document.querySelectorAll(".cell").forEach(el=>el.classList.remove("active"));if(!selected)return;const cell=current.cells[selected.r][selected.c];let w=current.words.find(w=>w.dir===direction&&cell.entries.includes(w.num));if(!w){w=current.words.find(w=>cell.entries.includes(w.num));if(w)direction=w.dir}if(!w)return;for(let k=0;k<w.answer.length;k++){let r=w.r+(w.dir==="down"?k:0),c=w.c+(w.dir==="across"?k:0);const el=document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);if(el)el.classList.add("active")}selected.word=w;}
+function setLetter(ch){if(!selected)return;const cell=current.cells[selected.r][selected.c];if(!cell)return;cell.value=ch;drawLetters();moveNext()}
+function drawLetters(){document.querySelectorAll(".cell").forEach(el=>{const cell=current.cells[+el.dataset.r][+el.dataset.c];if(cell){el.querySelector("span").textContent=cell.value;el.classList.toggle("filled",!!cell.value)}})}
+function moveNext(){if(!selected)return;let w=selected.word||current.words.find(w=>w.dir===direction&&current.cells[selected.r][selected.c].entries.includes(w.num));if(!w)return;let k=0;while(k<w.answer.length){let r=w.r+(w.dir==="down"?k:0),c=w.c+(w.dir==="across"?k:0);if(r===selected.r&&c===selected.c)break;k++}k++;if(k<w.answer.length){selected={r:w.r+(w.dir==="down"?k:0),c:w.c+(w.dir==="across"?k:0)};highlight()}}
+$("letterInput").addEventListener("input",e=>{const ch=clean(e.target.value).slice(-1);e.target.value="";if(ch)setLetter(ch)});
+document.addEventListener("keydown",e=>{if(!selected)return;if(/^[a-zA-Z]$/.test(e.key)){e.preventDefault();setLetter(e.key.toUpperCase())}else if(e.key==="Backspace"||e.key==="Delete"){e.preventDefault();current.cells[selected.r][selected.c].value="";drawLetters()}else if(e.key==="ArrowRight"||e.key==="ArrowLeft"||e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();let dr=e.key==="ArrowDown"?1:e.key==="ArrowUp"?-1:0,dc=e.key==="ArrowRight"?1:e.key==="ArrowLeft"?-1:0;let r=selected.r+dr,c=selected.c+dc;if(current.cells[r]?.[c]){selected={r,c};highlight()}}});
+function check(){let wrong=0,empty=0;current.words.forEach(w=>{for(let k=0;k<w.answer.length;k++){let r=w.r+(w.dir==="down"?k:0),c=w.c+(w.dir==="across"?k:0),cell=current.cells[r][c];if(!cell.value)empty++;else if(cell.value!==cell.answer)wrong++}});if(empty){$("status").textContent=`${empty} letter spaces are still empty. Keep going!`;return}if(wrong){$("status").textContent=`Not quite—${wrong} letters in the words need another look.`;return}if(!solved){solved=true;if(!done.includes(level))done.push(level);localStorage.setItem("crosswordDone",JSON.stringify(done));if(level<50)level=Math.max(level,level);localStorage.setItem("crosswordLevel",level);$("nextBtn").disabled=level===50;$("status").textContent=level===50?"Amazing! You completed all 50 levels! 🎉":"Excellent! Puzzle complete. The next level is unlocked! 🎉";drawLevels();updateProgress();if(level===50)$("nextBtn").textContent="All levels complete";else $("nextBtn").disabled=false}}
+$("checkBtn").onclick=check;
+$("hintBtn").onclick=()=>{if(hints<=0){$("status").textContent="No hints left for this level. Restart the level to refresh them.";return}let choices=[];current.cells.forEach((row,r)=>row.forEach((cell,c)=>{if(cell&&cell.value!==cell.answer)choices.push({r,c,cell})}));if(!choices.length){check();return}let q=selected&&choices.find(x=>x.r===selected.r&&x.c===selected.c)||choices[0];q.cell.value=q.cell.answer;selected={r:q.r,c:q.c};hints--;$("hintBtn").textContent="💡 Hint ("+hints+")";drawLetters();highlight();$("status").textContent="Hint revealed one letter.";});
+$("restartBtn").onclick=render;$("nextBtn").onclick=()=>{if(level<50&&done.includes(level)){level++;localStorage.setItem("crosswordLevel",level);render();window.scrollTo({top:0,behavior:"smooth"})}};
+function drawLevels(){$("levels").innerHTML="";for(let i=1;i<=50;i++){let b=document.createElement("button");b.className="level"+(done.includes(i)?" done":"")+(i>1&&!done.includes(i-1)?" locked":"");b.textContent=(done.includes(i)?"✓ ":"")+i;b.disabled=i>1&&!done.includes(i-1);b.title=tier(i);b.onclick=()=>{level=i;localStorage.setItem("crosswordLevel",level);render();$("gamePanel").scrollIntoView({behavior:"smooth"})};$("levels").append(b)}}
+function updateProgress(){let count=done.length;$("progressBar").style.width=(count/50*100)+"%";$("progressText").textContent=count+" / 50 levels completed";$("stars").textContent=count}
+$("resetBtn").onclick=()=>{if(confirm("Reset all 50 levels and erase saved progress?")){done=[];level=1;localStorage.removeItem("crosswordDone");localStorage.removeItem("crosswordLevel");render()}}
+render();
+</script>
+</body></html>
